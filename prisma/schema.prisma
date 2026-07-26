@@ -1,0 +1,357 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  TEACHER
+  REGISTRAR
+  PRINCIPAL
+  FINANCE_ADMIN
+  PARENT
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum SuspensionStatus {
+  PENDING
+  APPROVED
+  LIFTED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BehaviorType {
+  DISRUPTIVE
+  DEFIANCE
+  RULE_VIOLATION
+  AGGRESSIVE
+  ACADEMIC_MISCONDUCT
+  OTHER
+}
+
+// ─── NextAuth models ──────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core models ──────────────────────────────────────────────────────────────
+
+model School {
+  id            String         @id @default(cuid())
+  name          String
+  logo          String?
+  address       String?
+  periodType    String         @default("Trimester")
+  periodCount   Int            @default(3)
+  periodLabels  String[]       @default(["First", "Second", "Third"])
+  currentPeriod Int            @default(1)
+  schoolYear    String         @default("2025-2026")
+  createdAt     DateTime       @default(now())
+  users         User[]
+  sections      Section[]
+  announcements Announcement[]
+  events        Event[]
+  invoices      Invoice[]
+  subjects      Subject[]
+  periods       Period[]
+}
+
+model Period {
+  id           String       @id @default(cuid())
+  schoolId     String
+  label        String
+  order        Int
+  startDate    DateTime?
+  endDate      DateTime?
+  isActive     Boolean      @default(false)
+  school       School       @relation(fields: [schoolId], references: [id])
+  gradeEntries GradeEntry[]
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  password      String?
+  phoneNumber   String?
+  emailVerified DateTime?
+  image         String?
+  role          Role           @default(STUDENT)
+  schoolId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  school        School?        @relation(fields: [schoolId], references: [id])
+  accounts      Account[]
+  sessions      Session[]
+  student       Student?
+  teacher       Teacher?
+  parent        Parent?
+  announcements Announcement[]
+  events        Event[]
+  invoices      Invoice[]
+}
+
+model Student {
+  id           String             @id @default(cuid())
+  userId       String             @unique
+  sectionId    String?
+  createdAt    DateTime           @default(now())
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section      Section?           @relation(fields: [sectionId], references: [id])
+  parentId     String?
+  parent       Parent?            @relation(fields: [parentId], references: [id])
+  gradeEntries GradeEntry[]
+  submissions  Submission[]
+  invoices     Invoice[]
+  suspensions  AccessSuspension[]
+  behaviorReports BehaviorReport[]
+  flourishingAssessments FlourishingAssessment[]
+}
+
+model Parent {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children  Student[]
+}
+
+model Teacher {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  createdAt       DateTime         @default(now())
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sectionSubjects SectionSubject[]
+  assignments     Assignment[]
+  announcements   Announcement[]
+  behaviorReports BehaviorReport[]
+}
+
+model Section {
+  id              String           @id @default(cuid())
+  name            String
+  gradeLevel      String
+  schoolId        String
+  createdAt       DateTime         @default(now())
+  school          School           @relation(fields: [schoolId], references: [id])
+  students        Student[]
+  sectionSubjects SectionSubject[]
+  assignments     Assignment[]
+  announcements   Announcement[]
+}
+
+model Subject {
+  id              String           @id @default(cuid())
+  name            String
+  schoolId        String
+  school          School           @relation(fields: [schoolId], references: [id])
+  gradeEntries    GradeEntry[]
+  sectionSubjects SectionSubject[]
+  assignments     Assignment[]
+}
+
+model SectionSubject {
+  id        String   @id @default(cuid())
+  sectionId String
+  subjectId String
+  teacherId String?
+  section   Section  @relation(fields: [sectionId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+
+  @@unique([sectionId, subjectId])
+}
+
+model GradeEntry {
+  id         String   @id @default(cuid())
+  studentId  String
+  subjectId  String
+  periodId   String
+  quiz1      Float?
+  quiz2      Float?
+  quiz3      Float?
+  quiz4      Float?
+  quiz5      Float?
+  summative1 Float?
+  summative2 Float?
+  summative3 Float?
+  summative4 Float?
+  summative5 Float?
+  portfolio  Float?
+  portfolioUrl String?
+  finalExam  Float?
+  finalGrade Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  student    Student  @relation(fields: [studentId], references: [id])
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  period     Period   @relation(fields: [periodId], references: [id])
+
+  @@unique([studentId, subjectId, periodId])
+}
+
+model Assignment {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  fileUrl     String?
+  linkUrl     String?
+  dueDate     DateTime?
+  subjectId   String
+  sectionId   String
+  teacherId   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  section     Section      @relation(fields: [sectionId], references: [id])
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])
+  submissions Submission[]
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  studentId    String
+  portfolioUrl String?
+  fileUrl      String?
+  linkUrl      String?
+  submittedAt  DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  student      Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([assignmentId, studentId])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  schoolId  String?
+  sectionId String?
+  authorId  String
+  teacherId String?
+  status    ApprovalStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  school    School?  @relation(fields: [schoolId], references: [id])
+  section   Section? @relation(fields: [sectionId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+}
+
+model Event {
+  id        String         @id @default(cuid())
+  title     String
+  date      DateTime
+  schoolId  String
+  authorId  String
+  status    ApprovalStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  school    School         @relation(fields: [schoolId], references: [id])
+  author    User           @relation(fields: [authorId], references: [id])
+}
+
+model Invoice {
+  id          String            @id @default(cuid())
+  studentId   String
+  userId      String
+  schoolId    String
+  amount      Float
+  dueDate     DateTime
+  status      InvoiceStatus     @default(PENDING)
+  description String?
+  paymentProofUrl String?
+  paidAt      DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  student     Student           @relation(fields: [studentId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  school      School            @relation(fields: [schoolId], references: [id])
+  suspension  AccessSuspension?
+}
+
+model AccessSuspension {
+  id          String           @id @default(cuid())
+  studentId   String
+  invoiceId   String?          @unique
+  reason      String
+  status      SuspensionStatus @default(PENDING)
+  requestedBy String
+  approvedBy  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  student     Student          @relation(fields: [studentId], references: [id])
+  invoice     Invoice?         @relation(fields: [invoiceId], references: [id])
+}
+
+model BehaviorReport {
+  id          String       @id @default(cuid())
+  studentId   String
+  teacherId   String
+  type        BehaviorType
+  incident    String       @db.Text
+  actionTaken String?      @db.Text
+  counselorAction String?  @db.Text
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  student     Student      @relation(fields: [studentId], references: [id])
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])
+}
+
+model FlourishingAssessment {
+  id          String   @id @default(cuid())
+  studentId   String
+  type        String   // "Multiple Intelligences", "Emotional Quotients", etc
+  score       Float
+  details     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  student     Student  @relation(fields: [studentId], references: [id])
+}
+
