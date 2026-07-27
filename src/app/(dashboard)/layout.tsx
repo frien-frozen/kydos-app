@@ -27,6 +27,8 @@ import {
 import { Settings, User as UserIcon, LogOut, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 
+import { SuspensionGuard } from '@/components/layout/SuspensionGuard'
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -51,6 +53,36 @@ export default async function DashboardLayout({
     : null
 
   const schoolInitial = school?.name?.[0]?.toUpperCase() ?? 'K'
+
+  let isSuspended = false
+  let suspensionReason: string | null = null
+
+  if (role === 'STUDENT') {
+    const student = await prisma.student.findUnique({
+      where: { userId: user.id },
+      include: { suspensions: { where: { status: 'APPROVED' }, take: 1 } }
+    })
+    if (student?.suspensions.length) {
+      isSuspended = true
+      suspensionReason = student.suspensions[0].reason
+    }
+  } else if (role === 'PARENT') {
+    const parent = await prisma.parent.findUnique({
+      where: { userId: user.id },
+      include: {
+        children: {
+          include: { suspensions: { where: { status: 'APPROVED' }, take: 1 } }
+        }
+      }
+    })
+    if (parent) {
+      const suspendedChild = parent.children.find(c => c.suspensions.length > 0)
+      if (suspendedChild) {
+        isSuspended = true
+        suspensionReason = suspendedChild.suspensions[0].reason
+      }
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -147,7 +179,9 @@ export default async function DashboardLayout({
             <SidebarTrigger />
           </header>
           <main className="flex-1 p-6 md:p-8 bg-background animate-in fade-in duration-300">
-            {children}
+            <SuspensionGuard isSuspended={isSuspended} reason={suspensionReason}>
+              {children}
+            </SuspensionGuard>
           </main>
         </div>
       </div>

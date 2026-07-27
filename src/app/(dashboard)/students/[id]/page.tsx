@@ -1,4 +1,4 @@
-import { requireRole } from '@/lib/auth-utils'
+import { requireAuth } from '@/lib/auth-utils'
 import { ROLES } from '@/lib/roles'
 import { prisma } from '@/lib/prisma'
 import { computeGrade } from '@/lib/utils'
@@ -19,7 +19,11 @@ function fmt(v: number | null | undefined) {
 
 export default async function StudentProfilePage({ params }: Props) {
   const { id } = await params
-  await requireRole([ROLES.PRINCIPAL, ROLES.REGISTRAR, ROLES.TEACHER])
+  const sessionUser = await requireAuth()
+  
+  if (![ROLES.PRINCIPAL, ROLES.REGISTRAR, ROLES.TEACHER, ROLES.PARENT].includes(sessionUser.role as any)) {
+    notFound()
+  }
 
   const student = await prisma.student.findUnique({
     where:   { id },
@@ -39,6 +43,11 @@ export default async function StudentProfilePage({ params }: Props) {
   })
 
   if (!student) notFound()
+
+  // Prevent parents from viewing other students
+  if (sessionUser.role === ROLES.PARENT && student.parent?.userId !== sessionUser.id) {
+    notFound()
+  }
 
   // Group by period
   const periodMap = new Map<string, { label: string; entries: typeof student.gradeEntries }>()

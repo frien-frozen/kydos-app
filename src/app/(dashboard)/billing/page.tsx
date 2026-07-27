@@ -7,6 +7,7 @@ import { markInvoicePaid } from '@/server/billing'
 import { createPaymongoCheckoutSession } from '@/server/payments'
 import type { InvoiceStatus } from '@prisma/client'
 import { PaymentUpload } from '@/components/billing/PaymentUpload'
+import { CreateInvoiceForm } from '@/components/billing/CreateInvoiceForm'
 
 async function markPaidAction(invoiceId: string): Promise<void> {
   'use server'
@@ -99,12 +100,119 @@ async function StudentBillingView({ userId }: { userId: string }) {
   )
 }
 
+async function ParentBillingView({ userId }: { userId: string }) {
+  const parent = await prisma.parent.findUnique({
+    where: { userId },
+    include: {
+      children: {
+        include: {
+          user: { select: { name: true, email: true } }
+        }
+      }
+    }
+  })
+
+  if (!parent || parent.children.length === 0) {
+    return (
+      <div className="max-w-3xl space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Billing</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage billing for your children.</p>
+        </div>
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <p className="text-sm text-muted-foreground">You do not have any children linked to your account.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const childIds = parent.children.map(c => c.id)
+  
+  const invoices = await prisma.invoice.findMany({
+    where:   { studentId: { in: childIds } },
+    include: { student: { include: { user: { select: { name: true } } } } },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const totalOwed = invoices
+    .filter((i) => i.status !== 'PAID')
+    .reduce((sum, i) => sum + i.amount, 0)
+
+  return (
+    <div className="max-w-3xl space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Billing</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {totalOwed > 0 ? `Total outstanding: ${peso(totalOwed)}` : 'All payments up to date.'}
+        </p>
+      </div>
+
+      {invoices.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <p className="text-sm text-muted-foreground">No invoices yet.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+          {invoices.map((inv) => (
+            <div key={inv.id} className="flex items-center justify-between px-5 py-4">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-foreground">
+                  {inv.student.user.name} - {inv.description}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Due {formatDate(inv.dueDate)}
+                  {inv.paidAt ? ` · Paid ${formatDate(inv.paidAt)}` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-4 ml-4 shrink-0">
+                <span className="text-sm font-medium text-foreground">{peso(inv.amount)}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_PILL[inv.status]}`}>
+                  {STATUS_LABEL[inv.status]}
+                </span>
+                {inv.status !== 'PAID' && (
+                  <div className="flex flex-col gap-2 items-end">
+                    <form action={async () => {
+                      'use server'
+                      const res = await createPaymongoCheckoutSession(inv.id)
+                      if (res.success && res.data?.checkoutUrl) redirect(res.data.checkoutUrl)
+                    }}>
+                      <button className="text-xs px-3 py-1 bg-[#10a37f] text-primary-foreground rounded-full hover:bg-emerald-600 transition-colors">
+                        Pay via GCash
+                      </button>
+                    </form>
+                    {!inv.paymentProofUrl && <PaymentUpload invoiceId={inv.id} />}
+                    {inv.paymentProofUrl && (
+                      <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                        Receipt submitted
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 async function AdminBillingView({ schoolId }: { schoolId: string }) {
   const invoices = await prisma.invoice.findMany({
     where:   { schoolId },
     include: { user: { select: { name: true, email: true } } },
     orderBy: { createdAt: 'desc' },
   })
+
+  const studentsDb = await prisma.student.findMany({
+    where: { user: { schoolId } },
+    include: { user: { select: { id: true, name: true, email: true } } }
+  })
+  const students = studentsDb.map(s => ({
+    userId: s.user.id,
+    name: s.user.name,
+    email: s.user.email
+  }))
 
   const total   = invoices.length
   const paid    = invoices.filter((i) => i.status === 'PAID').length
@@ -120,9 +228,12 @@ async function AdminBillingView({ schoolId }: { schoolId: string }) {
 
   return (
     <div className="max-w-5xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Finance</h1>
-        <p className="text-sm text-muted-foreground mt-1">All school invoices.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Finance</h1>
+          <p className="text-sm text-muted-foreground mt-1">All school invoices.</p>
+        </div>
+        <CreateInvoiceForm schoolId={schoolId} students={students} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -195,6 +306,7 @@ export default async function BillingPage() {
   const user = await requireAuth()
 
   if (user.role === ROLES.STUDENT)      return <StudentBillingView userId={user.id} />
+  if (user.role === ROLES.PARENT)       return <ParentBillingView userId={user.id} />
   if (user.role === ROLES.FINANCE_ADMIN && user.schoolId) return <AdminBillingView schoolId={user.schoolId} />
 
   redirect(ROUTES.dashboard)

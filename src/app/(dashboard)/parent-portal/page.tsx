@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function ParentPortalPage() {
   const user = await getCurrentUser()
@@ -41,7 +42,11 @@ export default async function ParentPortalPage() {
             <div key={child.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
               <div className="bg-muted p-6 border-b border-border flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">{child.user.name}</h2>
+                  <Link href={`/students/${child.id}`}>
+                    <h2 className="text-xl font-bold text-foreground hover:underline transition-all">
+                      {child.user.name}
+                    </h2>
+                  </Link>
                   <p className="text-sm text-muted-foreground">{child.section?.name || 'Unassigned Section'} • {child.section?.gradeLevel || 'N/A'}</p>
                 </div>
                 <div className="text-right">
