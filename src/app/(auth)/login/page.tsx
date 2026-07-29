@@ -1,5 +1,6 @@
 import { signIn } from '@/lib/auth'
 import { APP_NAME, APP_TAGLINE } from '@/lib/constants'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { LoginForm } from './LoginForm'
 
@@ -13,9 +14,8 @@ export default function LoginPage() {
 
           {/* Wordmark */}
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {APP_NAME}
-            </h1>
+            <Image src="/darklogo.png" alt={APP_NAME} width={120} height={40} className="object-contain dark:hidden" />
+            <Image src="/lightlogo.png" alt={APP_NAME} width={120} height={40} className="object-contain hidden dark:block" />
             <p className="text-sm text-muted-foreground mt-1.5">{APP_TAGLINE}</p>
           </div>
 

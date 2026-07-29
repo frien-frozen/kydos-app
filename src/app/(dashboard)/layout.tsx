@@ -105,9 +105,10 @@ export default async function DashboardLayout({
                   <span className="text-[10px] font-semibold text-primary-foreground">{schoolInitial}</span>
                 </div>
               )}
-              <span className="text-base font-semibold tracking-tight text-foreground">
-                {APP_NAME}
-              </span>
+              <div className="flex items-center">
+                <Image src="/darklogo.png" alt={APP_NAME} width={80} height={20} className="object-contain dark:hidden" />
+                <Image src="/lightlogo.png" alt={APP_NAME} width={80} height={20} className="object-contain hidden dark:block" />
+              </div>
             </div>
             <div className="mt-3 h-px bg-sidebar-border" />
           </SidebarHeader>
