@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Kydos — School Management',
   description: 'School management, done right.',
+  icons: {
+    icon: "/favicon.ico?v=2",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
