@@ -14,9 +14,9 @@ export default function LoginPage() {
 
           {/* Wordmark */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Image src="/darklogo.png" alt="" width={36} height={36} className="w-9 h-9 object-contain dark:hidden" />
-              <Image src="/lightlogo.png" alt="" width={36} height={36} className="w-9 h-9 object-contain hidden dark:block" />
+            <div className="flex items-center gap-4 mb-1.5">
+              <Image src="/darklogo.png" alt="" width={24} height={24} className="w-6 h-6 object-contain dark:hidden" />
+              <Image src="/lightlogo.png" alt="" width={24} height={24} className="w-6 h-6 object-contain hidden dark:block" />
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 {APP_NAME}
               </h1>
