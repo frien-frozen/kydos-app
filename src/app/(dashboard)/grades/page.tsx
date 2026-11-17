@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth-utils'
 import { ROLES } from '@/lib/roles'
 import { prisma } from '@/lib/prisma'
 import { computeGrade, gradeStatus, cn } from '@/lib/utils'
+import { getSubjectIcon } from '@/lib/subject-icons'
 
 const GRADE_PILL: Record<string, string> = {
   excellent: 'bg-emerald-100 text-emerald-700',
@@ -91,9 +92,17 @@ export default async function StudentGradesPage() {
                     const grade   = computeGrade(entry)
                     const status  = gradeStatus(grade)
 
+                    const subjIcon = getSubjectIcon(entry.subject.name)
+                    const SubjIcon = subjIcon
+
                     return (
                       <tr key={entry.id} className="border-b border-border last:border-0 hover:bg-muted transition-colors duration-100">
-                        <td className="px-4 py-2.5 font-medium text-foreground">{entry.subject.name}</td>
+                        <td className="px-4 py-2.5 font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <SubjIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span>{entry.subject.name}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-2.5 text-center text-muted-foreground">
                           {quizAvg !== null ? quizAvg : <span className="text-muted-foreground">—</span>}
                         </td>

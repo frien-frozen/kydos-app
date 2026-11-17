@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import GradeRow from '@/components/gradebook/GradeRow'
 import { Toaster } from '@/components/ui/sonner'
+import { getSubjectIcon } from '@/lib/subject-icons'
 
 interface Props {
   params:       Promise<{ subject: string }>
@@ -66,6 +67,8 @@ export default async function GradeEntryPage({ params, searchParams }: Props) {
     portfolio: null, finalExam: null,
   }
 
+  const SubjectIcon = getSubjectIcon(sectionSubject.subject.name)
+
   return (
     <div className="space-y-6">
       <Toaster />
@@ -73,15 +76,22 @@ export default async function GradeEntryPage({ params, searchParams }: Props) {
       <div>
         <Link
           href={ROUTES.gradebook}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground mb-3 transition-colors duration-150"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors duration-150"
         >
           <ChevronLeft className="h-3 w-3" />
           Grade Book
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{sectionSubject.subject.name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {sectionSubject.section.name} · {students.length} student{students.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <SubjectIcon className="h-5 w-5 text-muted-foreground" />
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{sectionSubject.subject.name}</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {sectionSubject.section.name} · {students.length} student{students.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Period tabs */}

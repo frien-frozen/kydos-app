@@ -5,6 +5,7 @@ import { ROUTES } from '@/lib/routes'
 import { computeGrade } from '@/lib/utils'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { getSubjectIcon } from '@/lib/subject-icons'
 
 export default async function GradeBookPage() {
   const user = await requireRole([ROLES.TEACHER])
@@ -110,20 +111,31 @@ export default async function GradeBookPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {section.subjects.map(({ sectionSubjectId, subjectName }) => {
                   const avg = ssAvg.get(sectionSubjectId) ?? null
+                  const Icon = getSubjectIcon(subjectName)
+
                   return (
                     <Link
                       key={sectionSubjectId}
                       href={ROUTES.gradebookSubject(sectionSubjectId)}
-                      className="rounded-xl bg-muted border border-border px-5 py-4 hover:bg-accent hover:border-border transition-colors duration-150 cursor-pointer"
+                      className="group rounded-xl bg-card border border-border p-4 hover:border-foreground/20 hover:shadow-sm transition-all duration-150 flex flex-col justify-between gap-3 cursor-pointer"
                     >
-                      <p className="text-sm font-medium text-foreground">{subjectName}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {section.studentCount} student{section.studentCount !== 1 ? 's' : ''} · {section.sectionName}
-                      </p>
-                      {avg !== null && (
-                        <p className="text-xs text-muted-foreground mt-2 font-medium">
-                          Avg: {avg} · {activePeriod?.label ?? 'Current period'}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                            {subjectName}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {section.studentCount} student{section.studentCount !== 1 ? 's' : ''} · {section.sectionName}
                         </p>
+                      </div>
+
+                      {avg !== null && (
+                        <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Class Average</span>
+                          <span className="font-semibold text-foreground">{avg}</span>
+                        </div>
                       )}
                     </Link>
                   )

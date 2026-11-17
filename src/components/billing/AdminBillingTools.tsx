@@ -86,12 +86,14 @@ export function CreateInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <FileText className="w-4 h-4" />
-          Generate Invoice
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="gap-2">
+            <FileText className="w-4 h-4" />
+            Generate Invoice
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Generate Tuition Invoice</DialogTitle>
@@ -218,12 +220,14 @@ export function BillingSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Settings2 className="w-4 h-4" />
-          Tuition Settings
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="gap-2">
+            <Settings2 className="w-4 h-4" />
+            Tuition Settings
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tuition & Grace Period Settings</DialogTitle>
