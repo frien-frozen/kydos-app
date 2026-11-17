@@ -12,7 +12,7 @@ export default async function ParentPortalPage() {
     include: {
       children: {
         include: {
-          user: true,
+          user: { include: { school: true } },
           section: true,
           gradeEntries: { include: { subject: true } },
           behaviorReports: true,
@@ -38,59 +38,83 @@ export default async function ParentPortalPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {parent.children.map(child => (
-            <div key={child.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-              <div className="bg-muted p-6 border-b border-border flex items-center justify-between">
-                <div>
-                  <Link href={`/students/${child.id}`}>
-                    <h2 className="text-xl font-bold text-foreground hover:underline transition-all">
-                      {child.user.name}
-                    </h2>
-                  </Link>
-                  <p className="text-sm text-muted-foreground">{child.section?.name || 'Unassigned Section'} • {child.section?.gradeLevel || 'N/A'}</p>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">Enrolled</span>
-                </div>
-              </div>
-              
-              <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Grades */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground border-b border-border pb-2">Recent Grades</h3>
-                  {child.gradeEntries.length > 0 ? (
-                    <div className="space-y-3">
-                      {child.gradeEntries.slice(0, 5).map(grade => (
-                        <div key={grade.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                          <span className="font-medium text-sm text-foreground">{grade.subject.name}</span>
-                          <span className="font-bold text-foreground">{grade.finalGrade || '-'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No grades recorded yet.</p>
-                  )}
-                </div>
+          {parent.children.map(child => {
+            const school = child.user.school
+            const currentPaidUntil = child.paidUntil || new Date(0)
+            const graceEnd = new Date(currentPaidUntil.getTime() + ((school?.gracePeriodDays || 7) * 24 * 60 * 60 * 1000))
+            const isSuspended = new Date() > graceEnd
 
-                {/* Behavior & Flourishing */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground border-b border-border pb-2">Behavior & Flourishing</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="p-4 rounded-lg bg-muted border border-border">
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Behavior Reports</div>
-                      <div className="text-2xl font-bold text-foreground">{child.behaviorReports.length}</div>
+            return (
+              <div key={child.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+                <div className="bg-muted p-6 border-b border-border flex items-center justify-between">
+                  <div>
+                    {isSuspended ? (
+                      <h2 className="text-xl font-bold text-foreground opacity-50">
+                        {child.user.name}
+                      </h2>
+                    ) : (
+                      <Link href={`/students/${child.id}`}>
+                        <h2 className="text-xl font-bold text-foreground hover:underline transition-all">
+                          {child.user.name}
+                        </h2>
+                      </Link>
+                    )}
+                    <p className="text-sm text-muted-foreground">{child.section?.name || 'Unassigned Section'} • {child.section?.gradeLevel || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    {isSuspended ? (
+                      <span className="inline-block px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full border border-red-200">Suspended</span>
+                    ) : (
+                      <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">Enrolled</span>
+                    )}
+                  </div>
+                </div>
+                
+                {isSuspended ? (
+                  <div className="p-12 text-center bg-muted/30">
+                    <p className="text-sm text-red-600 font-medium">Access Suspended</p>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">This student's account is suspended due to unpaid balances. Please settle the account on the Billing page to restore access.</p>
+                  </div>
+                ) : (
+                  <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Grades */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground border-b border-border pb-2">Recent Grades</h3>
+                      {child.gradeEntries.length > 0 ? (
+                        <div className="space-y-3">
+                          {child.gradeEntries.slice(0, 5).map(grade => (
+                            <div key={grade.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                              <span className="font-medium text-sm text-foreground">{grade.subject.name}</span>
+                              <span className="font-bold text-foreground">{grade.finalGrade || '-'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No grades recorded yet.</p>
+                      )}
                     </div>
-                    <div className="p-4 rounded-lg bg-muted border border-border">
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">EQ Score</div>
-                      <div className="text-2xl font-bold text-foreground">
-                        {child.flourishingAssessments.find(a => a.type === 'EQ')?.score || 'N/A'}
+
+                    {/* Behavior & Flourishing */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground border-b border-border pb-2">Behavior & Flourishing</h3>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="p-4 rounded-lg bg-muted border border-border">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Behavior Reports</div>
+                          <div className="text-2xl font-bold text-foreground">{child.behaviorReports.length}</div>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted border border-border">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">EQ Score</div>
+                          <div className="text-2xl font-bold text-foreground">
+                            {child.flourishingAssessments.find(a => a.type === 'EQ')?.score || 'N/A'}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

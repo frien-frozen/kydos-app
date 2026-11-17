@@ -1,21 +1,21 @@
 import { Role } from '@prisma/client'
 
 export const ROLES = {
-  STUDENT:      'STUDENT',
-  TEACHER:      'TEACHER',
-  REGISTRAR:    'REGISTRAR',
-  PRINCIPAL:    'PRINCIPAL',
+  STUDENT:       'STUDENT',
+  TEACHER:       'TEACHER',
+  REGISTRAR:     'REGISTRAR',
+  PRINCIPAL:     'PRINCIPAL',
   FINANCE_ADMIN: 'FINANCE_ADMIN',
-  PARENT:       'PARENT',
+  PARENT:        'PARENT',
 } as const
 
 export const ROLE_LABELS: Record<Role, string> = {
-  STUDENT:      'Student',
-  TEACHER:      'Teacher',
-  REGISTRAR:    'Registrar',
-  PRINCIPAL:    'Principal',
+  STUDENT:       'Student',
+  TEACHER:       'Teacher',
+  REGISTRAR:     'Registrar',
+  PRINCIPAL:     'Principal',
   FINANCE_ADMIN: 'Finance Admin',
-  PARENT:       'Parent',
+  PARENT:        'Parent',
 }
 
 export const ROLE_NAV: Record<Role, { label: string; href: string }[]> = {
@@ -42,34 +42,39 @@ export const ROLE_NAV: Record<Role, { label: string; href: string }[]> = {
     { label: 'Students',  href: '/students' },
     { label: 'Teachers',  href: '/teachers' },
     { label: 'Calendar',  href: '/calendar' },
+    { label: 'Reports',   href: '/reports' },
     { label: 'Settings',  href: '/settings' },
   ],
   PRINCIPAL: [
     { label: 'Overview',      href: '/dashboard' },
     { label: 'Announcements', href: '/announcements' },
     { label: 'Students',      href: '/students' },
-    { label: 'Suspensions',   href: '/suspensions' },
     { label: 'Behavior',      href: '/behavior' },
     { label: 'Calendar',      href: '/calendar' },
     { label: 'Reports',       href: '/reports' },
+    { label: 'Finance',       href: '/billing' },
+    { label: 'Payments',      href: '/payments' },
+    { label: 'Settings',      href: '/settings' },
   ],
   FINANCE_ADMIN: [
     { label: 'Dashboard',   href: '/dashboard' },
-    { label: 'Invoices',    href: '/billing' },
+    { label: 'Billing',     href: '/billing' },
     { label: 'Payments',    href: '/payments' },
-    { label: 'Suspensions', href: '/suspensions' },
   ],
   PARENT: [
-    { label: 'Dashboard',   href: '/dashboard' },
-    { label: 'Children',    href: '/parent-portal' },
+    { label: 'Dashboard',     href: '/dashboard' },
+    { label: 'Children',      href: '/parent-portal' },
+    { label: 'Billing',       href: '/billing' },
+    { label: 'Announcements', href: '/announcements' },
+    { label: 'Calendar',      href: '/calendar' },
   ],
 }
 
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
-  STUDENT:      ['view:own_grades', 'view:own_assignments', 'view:announcements', 'view:own_billing'],
-  TEACHER:      ['edit:gradebook', 'create:assignment', 'create:announcement', 'view:section_students'],
-  REGISTRAR:    ['view:all_grades', 'view:all_students', 'generate:reports'],
-  PRINCIPAL:    ['create:announcement:school_wide', 'approve:suspension', 'view:all'],
+  STUDENT:       ['view:own_grades', 'view:own_assignments', 'view:announcements', 'view:own_billing'],
+  TEACHER:       ['edit:gradebook', 'create:assignment', 'create:announcement', 'view:section_students'],
+  REGISTRAR:     ['view:all_grades', 'view:all_students', 'generate:reports'],
+  PRINCIPAL:     ['create:announcement:school_wide', 'approve:suspension', 'view:all', 'view:billing'],
   FINANCE_ADMIN: ['create:invoice', 'request:suspension', 'view:billing'],
-  PARENT:       ['view:child_grades', 'view:child_attendance'],
+  PARENT:        ['view:child_grades', 'view:child_attendance', 'view:own_billing'],
 }

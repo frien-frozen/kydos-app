@@ -3,17 +3,27 @@ import { prisma } from '@/lib/prisma'
 import { requireRole, getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
 import { ROLES } from '@/lib/roles'
+import { revalidatePath } from 'next/cache'
+import { ROUTES } from '@/lib/routes'
 
-// Update school info
-export async function updateSchoolSettings(schoolId: string, data: {
-  name?: string
-  periodType?: string
-  periodCount?: number
-  schoolYear?: string
-  logo?: string
-}) {
-  await requireRole([ROLES.PRINCIPAL])
-  return prisma.school.update({ where: { id: schoolId }, data })
+const SchoolSettingsSchema = z.object({
+  name:            z.string().min(1).optional(),
+  periodType:      z.string().min(1).optional(),
+  periodCount:     z.number().int().min(1).max(6).optional(),
+  schoolYear:      z.string().min(1).optional(),
+  logo:            z.string().optional(),
+  monthlyTuition:  z.number().min(0).optional(),
+  gracePeriodDays: z.number().int().min(0).max(90).optional(),
+})
+
+// Update school info (Principal or Finance Admin for billing settings)
+export async function updateSchoolSettings(schoolId: string, data: z.infer<typeof SchoolSettingsSchema>) {
+  await requireRole([ROLES.PRINCIPAL, ROLES.FINANCE_ADMIN])
+  const parsed = SchoolSettingsSchema.parse(data)
+  const updated = await prisma.school.update({ where: { id: schoolId }, data: parsed })
+  revalidatePath(ROUTES.settings)
+  revalidatePath(ROUTES.billing)
+  return updated
 }
 
 // Update period labels + dates

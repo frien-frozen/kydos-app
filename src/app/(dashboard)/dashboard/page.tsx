@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { computeGrade } from '@/lib/utils'
+import Link from 'next/link'
 
 interface StatCard {
   label: string
@@ -8,10 +9,54 @@ interface StatCard {
   sub:   string
 }
 
+interface BillingAlert {
+  level: 'regular' | 'urgent' | 'grace'
+  title: string
+  message: string
+}
+
 interface DashboardData {
   title:    string
   subtitle: string
   stats:    StatCard[]
+  alerts?:  BillingAlert[]
+}
+
+function evaluateBillingAlert(paidUntil: Date | null, gracePeriodDays: number, studentLabel?: string): BillingAlert | null {
+  if (!paidUntil) return null
+  const now = new Date()
+  const diffDays = Math.ceil((paidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const prefix = studentLabel ? `${studentLabel}: ` : ''
+
+  if (diffDays < 0) {
+    const graceRemaining = gracePeriodDays + diffDays
+    if (graceRemaining >= 0) {
+      return {
+        level: 'grace',
+        title: `${prefix}Grace Period Active`,
+        message: `Tuition expired on ${paidUntil.toLocaleDateString()}. You have ${graceRemaining} day(s) of grace period remaining before account access is interrupted.`,
+      }
+    }
+    return null
+  }
+
+  if (diffDays <= 2) {
+    return {
+      level: 'urgent',
+      title: `${prefix}Urgent Billing Reminder (Due in ${diffDays} ${diffDays === 1 ? 'day' : 'days'})`,
+      message: `Your tuition subscription is due on ${paidUntil.toLocaleDateString()}. Please settle your balance or upload a payment receipt to avoid access interruption.`,
+    }
+  }
+
+  if (diffDays <= 7) {
+    return {
+      level: 'regular',
+      title: `${prefix}Upcoming Tuition Reminder (Due in ${diffDays} days)`,
+      message: `Your tuition subscription renews on ${paidUntil.toLocaleDateString()}. Visit Billing to extend or upload a receipt early.`,
+    }
+  }
+
+  return null
 }
 
 async function getActivePeriodId(schoolId: string): Promise<string | null> {
@@ -25,7 +70,12 @@ async function getActivePeriodId(schoolId: string): Promise<string | null> {
 async function getStudentData(userId: string, name: string): Promise<DashboardData> {
   const student = await prisma.student.findUnique({
     where:  { userId },
-    select: { id: true, sectionId: true, user: { select: { schoolId: true } } },
+    select: {
+      id: true,
+      sectionId: true,
+      paidUntil: true,
+      user: { select: { schoolId: true, school: { select: { gracePeriodDays: true } } } },
+    },
   })
 
   if (!student) {
@@ -56,7 +106,7 @@ async function getStudentData(userId: string, name: string): Promise<DashboardDa
         })
       : Promise.resolve([]),
     prisma.invoice.findFirst({
-      where:   { userId },
+      where:   { studentId: student.id },
       orderBy: { createdAt: 'desc' },
       select:  { status: true },
     }),
@@ -76,10 +126,17 @@ async function getStudentData(userId: string, name: string): Promise<DashboardDa
     ? Math.round((grades.reduce((a, b) => a + b, 0) / grades.length) * 10) / 10
     : null
 
+  const now = new Date()
   const billingStatus =
-    latestInvoice?.status === 'PAID'    ? 'Paid' :
-    latestInvoice?.status === 'OVERDUE' ? 'Overdue' :
-    latestInvoice                       ? 'Unpaid' : '—'
+    student.paidUntil && student.paidUntil > now ? 'Active' :
+    latestInvoice?.status === 'PENDING'          ? 'Pending Review' :
+    latestInvoice?.status === 'OVERDUE'          ? 'Overdue' :
+    latestInvoice?.status === 'PAID'             ? 'Paid' : 'Unpaid'
+
+  const alert = evaluateBillingAlert(
+    student.paidUntil,
+    student.user.school?.gracePeriodDays ?? 7
+  )
 
   return {
     title:    `Welcome back, ${name.split(' ')[0]}.`,
@@ -87,8 +144,55 @@ async function getStudentData(userId: string, name: string): Promise<DashboardDa
     stats: [
       { label: 'Grade Average',   value: avg !== null ? String(avg) : '—', sub: 'Current period' },
       { label: 'Assignments Due', value: String(pendingCount),              sub: 'Pending submission' },
-      { label: 'Billing Status',  value: billingStatus,                     sub: 'Current period' },
+      { label: 'Billing Status',  value: billingStatus,                     sub: student.paidUntil ? `Until ${student.paidUntil.toLocaleDateString()}` : 'Action required' },
     ],
+    alerts: alert ? [alert] : [],
+  }
+}
+
+async function getParentData(userId: string, name: string): Promise<DashboardData> {
+  const parent = await prisma.parent.findUnique({
+    where: { userId },
+    include: {
+      children: {
+        include: {
+          user: { include: { school: true } },
+          gradeEntries: true,
+        },
+      },
+    },
+  })
+
+  const children = parent?.children ?? []
+  const allGrades = children
+    .flatMap((c) => c.gradeEntries.map(computeGrade))
+    .filter((g): g is number => g !== null)
+  const avg = allGrades.length
+    ? Math.round((allGrades.reduce((a, b) => a + b, 0) / allGrades.length) * 10) / 10
+    : null
+
+  const now = new Date()
+  const activeChildren = children.filter((c) => c.paidUntil && c.paidUntil > now).length
+  const alerts: BillingAlert[] = []
+
+  for (const child of children) {
+    const alert = evaluateBillingAlert(
+      child.paidUntil,
+      child.user.school?.gracePeriodDays ?? 7,
+      child.user.name || child.user.email
+    )
+    if (alert) alerts.push(alert)
+  }
+
+  return {
+    title:    `Welcome, ${name.split(' ')[0]}.`,
+    subtitle: "Overview of your children's academic progress and tuition status.",
+    stats: [
+      { label: 'Linked Children', value: String(children.length),                sub: 'Enrolled students' },
+      { label: 'Average Grade',   value: avg !== null ? String(avg) : '—',        sub: 'Across all subjects' },
+      { label: 'Active Tuition',  value: `${activeChildren}/${children.length}`, sub: 'Accounts in good standing' },
+    ],
+    alerts,
   }
 }
 
@@ -122,10 +226,10 @@ async function getTeacherData(userId: string): Promise<DashboardData> {
 }
 
 async function getFinanceData(schoolId: string): Promise<DashboardData> {
-  const [total, paid, overdue] = await Promise.all([
+  const [total, paid, pendingOrOverdue] = await Promise.all([
     prisma.invoice.count({ where: { schoolId } }),
     prisma.invoice.count({ where: { schoolId, status: 'PAID' } }),
-    prisma.invoice.count({ where: { schoolId, status: 'OVERDUE' } }),
+    prisma.invoice.count({ where: { schoolId, status: { in: ['PENDING', 'OVERDUE'] } } }),
   ])
 
   const rate = total > 0 ? Math.round((paid / total) * 100) : 0
@@ -134,19 +238,32 @@ async function getFinanceData(schoolId: string): Promise<DashboardData> {
     title:    'Finance Overview',
     subtitle: 'Billing and payment status this period.',
     stats: [
-      { label: 'Total Invoices', value: String(total),   sub: 'This billing cycle' },
-      { label: 'Paid',           value: String(paid),    sub: `${rate}% collection rate` },
-      { label: 'Overdue',        value: String(overdue), sub: 'Require follow-up' },
+      { label: 'Total Invoices',    value: String(total),            sub: 'All recorded bills' },
+      { label: 'Paid',              value: String(paid),             sub: `${rate}% collection rate` },
+      { label: 'Pending / Overdue', value: String(pendingOrOverdue), sub: 'Require review or follow-up' },
     ],
   }
 }
 
 async function getPrincipalData(schoolId: string): Promise<DashboardData> {
   const activePeriodId = await getActivePeriodId(schoolId)
+  const school = await prisma.school.findUnique({ where: { id: schoolId } })
+  const gracePeriodDays = school?.gracePeriodDays ?? 7
+  
+  const thresholdDate = new Date()
+  thresholdDate.setDate(thresholdDate.getDate() - gracePeriodDays)
 
-  const [studentCount, pendingSuspensions, entries] = await Promise.all([
+  const [studentCount, activeSuspensions, entries] = await Promise.all([
     prisma.student.count({ where: { user: { schoolId } } }),
-    prisma.accessSuspension.count({ where: { status: 'PENDING', student: { user: { schoolId } } } }),
+    prisma.student.count({ 
+      where: { 
+        user: { schoolId },
+        OR: [
+          { paidUntil: null },
+          { paidUntil: { lt: thresholdDate } }
+        ]
+      } 
+    }),
     activePeriodId
       ? prisma.gradeEntry.findMany({
           where: { periodId: activePeriodId, student: { user: { schoolId } } },
@@ -168,9 +285,9 @@ async function getPrincipalData(schoolId: string): Promise<DashboardData> {
     title:    'School Overview',
     subtitle: 'A snapshot of how the school is doing.',
     stats: [
-      { label: 'Total Students',      value: String(studentCount),                           sub: 'Currently enrolled' },
-      { label: 'School Average',      value: schoolAvg !== null ? String(schoolAvg) : '—',   sub: 'Current period' },
-      { label: 'Pending Suspensions', value: String(pendingSuspensions),                      sub: 'Awaiting approval' },
+      { label: 'Total Students',      value: String(studentCount),                         sub: 'Currently enrolled' },
+      { label: 'School Average',      value: schoolAvg !== null ? String(schoolAvg) : '—', sub: 'Current period' },
+      { label: 'Active Suspensions',  value: String(activeSuspensions),                    sub: 'Manage in Finance tab' },
     ],
   }
 }
@@ -201,6 +318,9 @@ export default async function DashboardPage() {
     case 'STUDENT':
       data = await getStudentData(user.id, user.name ?? 'there')
       break
+    case 'PARENT':
+      data = await getParentData(user.id, user.name ?? 'there')
+      break
     case 'TEACHER':
       data = await getTeacherData(user.id)
       break
@@ -217,7 +337,7 @@ export default async function DashboardPage() {
       data = { title: 'Dashboard', subtitle: 'Welcome.', stats: [] }
   }
 
-  const { title, subtitle, stats } = data
+  const { title, subtitle, stats, alerts } = data
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -225,6 +345,34 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
         <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
       </div>
+
+      {alerts && alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert, idx) => {
+            const styles =
+              alert.level === 'grace'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : alert.level === 'urgent'
+                ? 'border-amber-300 bg-amber-50 text-amber-900'
+                : 'border-blue-200 bg-blue-50 text-blue-900'
+
+            return (
+              <div key={idx} className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${styles}`}>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{alert.title}</p>
+                  <p className="text-xs opacity-90">{alert.message}</p>
+                </div>
+                <Link
+                  href="/billing"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-background text-foreground border border-border hover:bg-muted transition-colors shrink-0 text-center"
+                >
+                  Go to Billing
+                </Link>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((stat, i) => (

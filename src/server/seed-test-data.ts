@@ -7,13 +7,13 @@ async function main() {
   // Clear related records first (cascade delete where possible)
   await prisma.flourishingAssessment.deleteMany()
   await prisma.behaviorReport.deleteMany()
-  await prisma.accessSuspension.deleteMany()
   await prisma.invoice.deleteMany()
   await prisma.submission.deleteMany()
   await prisma.assignment.deleteMany()
   await prisma.gradeEntry.deleteMany()
   await prisma.sectionSubject.deleteMany()
   await prisma.announcement.deleteMany()
+  await prisma.event.deleteMany()
   
   await prisma.student.deleteMany()
   await prisma.teacher.deleteMany()
@@ -37,6 +37,8 @@ async function main() {
       periodLabels: ['First', 'Second', 'Third'],
       schoolYear: '2025-2026',
       currentPeriod: 1,
+      monthlyTuition: 2500,
+      gracePeriodDays: 7,
     }
   })
 

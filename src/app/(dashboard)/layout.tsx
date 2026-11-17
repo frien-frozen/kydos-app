@@ -60,29 +60,23 @@ export default async function DashboardLayout({
   if (role === 'STUDENT') {
     const student = await prisma.student.findUnique({
       where: { userId: user.id },
-      include: { suspensions: { where: { status: 'APPROVED' }, take: 1 } }
+      include: { user: { include: { school: true } } }
     })
-    if (student?.suspensions.length) {
-      isSuspended = true
-      suspensionReason = student.suspensions[0].reason
-    }
-  } else if (role === 'PARENT') {
-    const parent = await prisma.parent.findUnique({
-      where: { userId: user.id },
-      include: {
-        children: {
-          include: { suspensions: { where: { status: 'APPROVED' }, take: 1 } }
+    
+    if (student) {
+      const school = student.user.school
+      if (school) {
+        const currentPaidUntil = student.paidUntil || new Date(0)
+        const graceEnd = new Date(currentPaidUntil.getTime() + (school.gracePeriodDays * 24 * 60 * 60 * 1000))
+        if (new Date() > graceEnd) {
+          isSuspended = true
+          suspensionReason = `Your account is suspended due to unpaid balances. Please settle your account to restore access.`
         }
-      }
-    })
-    if (parent) {
-      const suspendedChild = parent.children.find(c => c.suspensions.length > 0)
-      if (suspendedChild) {
-        isSuspended = true
-        suspensionReason = suspendedChild.suspensions[0].reason
       }
     }
   }
+  // PARENT is no longer globally suspended. Their dashboard is always accessible, 
+  // but individual children are blocked from their specific views.
 
   return (
     <SidebarProvider>

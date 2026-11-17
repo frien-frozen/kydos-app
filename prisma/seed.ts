@@ -11,17 +11,20 @@ const prisma = new PrismaClient({ adapter })
 
 async function main() {
   console.log('Cleaning up database...')
-  await prisma.accessSuspension.deleteMany()
+  await prisma.flourishingAssessment.deleteMany()
+  await prisma.behaviorReport.deleteMany()
   await prisma.invoice.deleteMany()
   await prisma.submission.deleteMany()
   await prisma.gradeEntry.deleteMany()
   await prisma.sectionSubject.deleteMany()
   await prisma.assignment.deleteMany()
   await prisma.announcement.deleteMany()
+  await prisma.event.deleteMany()
   await prisma.subject.deleteMany()
-  await prisma.student.updateMany({ data: { sectionId: null } })
+  await prisma.student.updateMany({ data: { sectionId: null, parentId: null } })
   await prisma.section.deleteMany()
   await prisma.student.deleteMany()
+  await prisma.parent.deleteMany()
   await prisma.teacher.deleteMany()
   await prisma.period.deleteMany()
   await prisma.user.updateMany({ data: { schoolId: null } })
@@ -31,12 +34,14 @@ async function main() {
   // Create Test Academy
   const school = await prisma.school.create({
     data: {
-      name:         'Kydos Demo Academy',
-      periodType:   'Trimester',
-      periodCount:  3,
-      periodLabels: ['First Trimester', 'Second Trimester', 'Third Trimester'],
-      schoolYear:   '2025-2026',
-      currentPeriod: 1,
+      name:            'Kydos Demo Academy',
+      periodType:      'Trimester',
+      periodCount:     3,
+      periodLabels:    ['First Trimester', 'Second Trimester', 'Third Trimester'],
+      schoolYear:      '2025-2026',
+      currentPeriod:   1,
+      monthlyTuition:  2500,
+      gracePeriodDays: 7,
     },
   })
   console.log(`✓ School created: ${school.name}`)
@@ -79,7 +84,15 @@ async function main() {
         create: { userId: user.id }
       })
     } else if (acc.role === 'STUDENT') {
+      const nextMonth = new Date()
+      nextMonth.setDate(nextMonth.getDate() + 30)
       await prisma.student.upsert({
+        where: { userId: user.id },
+        update: { paidUntil: nextMonth },
+        create: { userId: user.id, paidUntil: nextMonth }
+      })
+    } else if (acc.role === 'PARENT') {
+      await prisma.parent.upsert({
         where: { userId: user.id },
         update: {},
         create: { userId: user.id }

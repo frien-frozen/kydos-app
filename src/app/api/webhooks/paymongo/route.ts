@@ -6,12 +6,37 @@ export async function POST(req: Request) {
     const payload = await req.json()
 
     if (payload.data?.attributes?.type === 'payment.paid') {
-      const invoiceId = payload.data.attributes.data.attributes.description
+      const invoiceId = payload.data.attributes.data?.attributes?.description
       if (invoiceId) {
-        await prisma.invoice.update({
+        const existing = await prisma.invoice.findUnique({
           where: { id: invoiceId },
-          data: { status: 'PAID', paidAt: new Date() },
+          include: { student: true },
         })
+
+        if (existing && existing.status !== 'PAID') {
+          const currentPaidUntil =
+            existing.student.paidUntil && existing.student.paidUntil > new Date()
+              ? existing.student.paidUntil
+              : new Date()
+
+          const newPaidUntil = new Date(currentPaidUntil)
+          newPaidUntil.setMonth(newPaidUntil.getMonth() + (existing.monthsPaid || 1))
+
+          await prisma.$transaction([
+            prisma.invoice.update({
+              where: { id: invoiceId },
+              data: {
+                status: 'PAID',
+                paidAt: new Date(),
+                paymentMethod: existing.paymentMethod || 'PayMongo Online',
+              },
+            }),
+            prisma.student.update({
+              where: { id: existing.studentId },
+              data: { paidUntil: newPaidUntil },
+            }),
+          ])
+        }
       }
     }
 

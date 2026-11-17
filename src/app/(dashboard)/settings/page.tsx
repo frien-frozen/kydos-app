@@ -20,7 +20,15 @@ export default async function SettingsPage() {
   const [school, periods, subjects, sections, teachers] = await Promise.all([
     prisma.school.findUnique({
       where: { id: schoolId },
-      select: { id: true, name: true, periodType: true, schoolYear: true, logo: true },
+      select: {
+        id: true,
+        name: true,
+        periodType: true,
+        schoolYear: true,
+        logo: true,
+        monthlyTuition: true,
+        gracePeriodDays: true,
+      },
     }),
     prisma.period.findMany({
       where: { schoolId },

@@ -12,7 +12,6 @@ export const ROUTES = {
   announcementsNew: '/announcements/new',
   billing:          '/billing',
   payments:         '/payments',
-  suspensions:      '/suspensions',
   students:         '/students',
   student:          (id: string) => `/students/${id}`,
   reports:          '/reports',

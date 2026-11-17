@@ -24,11 +24,6 @@ enum InvoiceStatus {
   OVERDUE
 }
 
-enum SuspensionStatus {
-  PENDING
-  APPROVED
-  LIFTED
-}
 
 enum ApprovalStatus {
   PENDING
@@ -93,6 +88,8 @@ model School {
   periodLabels  String[]       @default(["First", "Second", "Third"])
   currentPeriod Int            @default(1)
   schoolYear    String         @default("2025-2026")
+  monthlyTuition Float         @default(0)
+  gracePeriodDays Int          @default(7)
   createdAt     DateTime       @default(now())
   users         User[]
   sections      Section[]
@@ -142,6 +139,7 @@ model Student {
   id           String             @id @default(cuid())
   userId       String             @unique
   sectionId    String?
+  paidUntil    DateTime?
   createdAt    DateTime           @default(now())
   user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   section      Section?           @relation(fields: [sectionId], references: [id])
@@ -150,7 +148,6 @@ model Student {
   gradeEntries GradeEntry[]
   submissions  Submission[]
   invoices     Invoice[]
-  suspensions  AccessSuspension[]
   behaviorReports BehaviorReport[]
   flourishingAssessments FlourishingAssessment[]
 }
@@ -302,33 +299,22 @@ model Invoice {
   studentId   String
   userId      String
   schoolId    String
-  amount      Float
-  dueDate     DateTime
-  status      InvoiceStatus     @default(PENDING)
-  description String?
+  amount          Float
+  dueDate         DateTime?
+  status          InvoiceStatus     @default(PENDING)
+  description     String?
+  monthsPaid      Int?
+  paymentMethod   String?
   paymentProofUrl String?
-  paidAt      DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  student     Student           @relation(fields: [studentId], references: [id])
-  user        User              @relation(fields: [userId], references: [id])
-  school      School            @relation(fields: [schoolId], references: [id])
-  suspension  AccessSuspension?
+  paidAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  student         Student           @relation(fields: [studentId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
+  school          School            @relation(fields: [schoolId], references: [id])
 }
 
-model AccessSuspension {
-  id          String           @id @default(cuid())
-  studentId   String
-  invoiceId   String?          @unique
-  reason      String
-  status      SuspensionStatus @default(PENDING)
-  requestedBy String
-  approvedBy  String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  student     Student          @relation(fields: [studentId], references: [id])
-  invoice     Invoice?         @relation(fields: [invoiceId], references: [id])
-}
+
 
 model BehaviorReport {
   id          String       @id @default(cuid())

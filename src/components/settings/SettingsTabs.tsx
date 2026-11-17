@@ -25,7 +25,15 @@ import {
   addSubjectToSection,
 } from '@/server/settings'
 
-type SchoolData = { id: string; name: string; periodType: string | null; schoolYear: string | null; logo: string | null }
+type SchoolData = {
+  id: string
+  name: string
+  periodType: string | null
+  schoolYear: string | null
+  logo: string | null
+  monthlyTuition?: number
+  gracePeriodDays?: number
+}
 type PeriodData = { id: string; label: string; order: number; startDate: Date | null; endDate: Date | null; isActive: boolean }
 type SubjectData = { id: string; name: string }
 type SectionSubjectData = {
@@ -84,6 +92,8 @@ function GeneralTab({ school }: { school: SchoolData }) {
   const [name, setName] = useState(school.name)
   const [schoolYear, setSchoolYear] = useState(school.schoolYear ?? '')
   const [periodType, setPeriodType] = useState(school.periodType ?? '')
+  const [monthlyTuition, setMonthlyTuition] = useState(String(school.monthlyTuition ?? 0))
+  const [gracePeriodDays, setGracePeriodDays] = useState(String(school.gracePeriodDays ?? 7))
   const [logo, setLogo] = useState(school.logo)
   const [pending, startTransition] = useTransition()
 
@@ -92,7 +102,13 @@ function GeneralTab({ school }: { school: SchoolData }) {
   function save() {
     startTransition(async () => {
       try {
-        await updateSchoolSettings(school.id, { name, schoolYear, periodType })
+        await updateSchoolSettings(school.id, {
+          name,
+          schoolYear,
+          periodType,
+          monthlyTuition: Math.max(0, parseFloat(monthlyTuition) || 0),
+          gracePeriodDays: Math.max(0, parseInt(gracePeriodDays, 10) || 0),
+        })
         toast.success('Settings saved')
         router.refresh()
       } catch {
@@ -165,6 +181,30 @@ function GeneralTab({ school }: { school: SchoolData }) {
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Period type</Label>
           <Input value={periodType} onChange={e => setPeriodType(e.target.value)} placeholder="Trimester" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Monthly Tuition (₱)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={monthlyTuition}
+              onChange={e => setMonthlyTuition(e.target.value)}
+              placeholder="2500.00"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grace Period (Days)</Label>
+            <Input
+              type="number"
+              min="0"
+              max="90"
+              value={gracePeriodDays}
+              onChange={e => setGracePeriodDays(e.target.value)}
+              placeholder="7"
+            />
+          </div>
         </div>
         <button
           onClick={save}

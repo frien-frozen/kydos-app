@@ -21,13 +21,18 @@ export default async function StudentsPage() {
     select: { id: true },
   })
 
+  const school = await prisma.school.findUnique({ where: { id: user.schoolId } })
+  const gracePeriodDays = school?.gracePeriodDays ?? 7
+  
+  const thresholdDate = new Date()
+  thresholdDate.setDate(thresholdDate.getDate() - gracePeriodDays)
+
   const students = await prisma.student.findMany({
     where: { user: { schoolId: user.schoolId } },
     include: {
       user:         { select: { name: true, email: true } },
       section:      { select: { name: true, gradeLevel: true } },
       gradeEntries: { where: { periodId: activePeriod?.id ?? '' } },
-      suspensions:  { where: { status: 'APPROVED' }, take: 1 },
     },
     orderBy: { user: { name: 'asc' } },
   })
@@ -45,7 +50,7 @@ export default async function StudentsPage() {
       sectionName: s.section?.name ?? null,
       gradeLevel:  s.section?.gradeLevel ?? null,
       avgGrade,
-      isSuspended: s.suspensions.length > 0,
+      isSuspended: !s.paidUntil || s.paidUntil < thresholdDate,
     }
   })
 

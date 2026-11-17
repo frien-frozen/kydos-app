@@ -28,7 +28,7 @@ export default async function StudentProfilePage({ params }: Props) {
   const student = await prisma.student.findUnique({
     where:   { id },
     include: {
-      user:    { select: { name: true, email: true, schoolId: true } },
+      user:    { select: { name: true, email: true, schoolId: true, school: true } },
       section: { select: { name: true, gradeLevel: true } },
       gradeEntries: {
         include: {
@@ -37,7 +37,6 @@ export default async function StudentProfilePage({ params }: Props) {
         },
         orderBy: [{ period: { order: 'asc' } }, { subject: { name: 'asc' } }],
       },
-      suspensions: { where: { status: 'APPROVED' }, take: 1 },
       parent:      { include: { user: { select: { name: true, email: true } } } },
     },
   })
@@ -59,7 +58,12 @@ export default async function StudentProfilePage({ params }: Props) {
   }
   const byPeriod = Array.from(periodMap.values())
 
-  const isSuspended = student.suspensions.length > 0
+  const school = student.user.school
+  const gracePeriodDays = school?.gracePeriodDays ?? 7
+  const thresholdDate = new Date()
+  thresholdDate.setDate(thresholdDate.getDate() - gracePeriodDays)
+  
+  const isSuspended = !student.paidUntil || student.paidUntil < thresholdDate
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -78,7 +82,7 @@ export default async function StudentProfilePage({ params }: Props) {
       {isSuspended && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
           <p className="text-sm font-medium text-red-700">Access suspended</p>
-          <p className="text-xs text-red-500 mt-0.5">{student.suspensions[0].reason}</p>
+          <p className="text-xs text-red-500 mt-0.5">Account suspended due to unpaid balances.</p>
         </div>
       )}
 
